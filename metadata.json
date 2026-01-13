@@ -1,0 +1,5 @@
+{
+  "name": "PromptForge: System Instruction Constructor",
+  "description": "A specialized tool for engineering robust, stack-specific system instructions for LLMs. Features template management, constraint configuration, and AI-powered prompt optimization.",
+  "requestFramePermissions": []
+}
