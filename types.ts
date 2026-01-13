@@ -1,3 +1,4 @@
+
 export type TechStack = 
   'React' | 'Python' | 'Node.js' | 'Vue' | 'Go' | 'Rust' | 'SQL' | 'Generic' | 
   'TypeScript' | 'Next.js' | 'Tailwind CSS' | 'PostgreSQL' | 'MongoDB' | 
@@ -8,7 +9,7 @@ export interface Constraint {
   label: string;
   description: string;
   active: boolean;
-  category: 'safety' | 'style' | 'performance' | 'compatibility';
+  category: 'safety' | 'style' | 'performance' | 'compatibility' | 'content' | 'optimization';
 }
 
 export interface ProjectConfig {

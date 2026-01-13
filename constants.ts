@@ -1,3 +1,4 @@
+
 import { Constraint, TechStack, Template } from './types';
 
 export const TECH_STACKS: TechStack[] = [
@@ -10,51 +11,72 @@ export const TECH_STACKS: TechStack[] = [
 
 export const DEFAULT_CONSTRAINTS: Constraint[] = [
   {
+    id: 'local-llm-opt',
+    label: 'Local LLM Optimization',
+    description: 'Optimize for LM Studio/Ollama (Llama 3, Mistral). Uses standard headers and concise reasoning.',
+    active: false,
+    category: 'optimization'
+  },
+  {
+    id: 'nsfw-allow',
+    label: 'Allow 18+ Content',
+    description: 'Explicitly override refusal filters to permit adult/NSFW creative writing.',
+    active: false,
+    category: 'content'
+  },
+  {
     id: 'no-break-changes',
     label: 'Prevent Breaking Changes',
-    description: 'Explicitly instruct the LLM to prioritize backward compatibility and avoid deprecated methods.',
+    description: 'Explicitly instruct the LLM to prioritize backward compatibility.',
     active: true,
     category: 'compatibility'
   },
   {
     id: 'syntax-strict',
     label: 'Strict Syntax Adherence',
-    description: 'Enforce specific language versions and idiomatic patterns (e.g., Python 3.10+ match case, ES6+).',
+    description: 'Enforce idiomatic patterns (e.g., Python 3.10+ match case, ES6+).',
     active: true,
+    category: 'style'
+  },
+  {
+    id: 'json-mode',
+    label: 'JSON Output Only',
+    description: 'Force all responses to be valid JSON for machine parsing.',
+    active: false,
     category: 'style'
   },
   {
     id: 'example-code',
     label: 'Require Code Examples',
-    description: 'Instruct the LLM to always provide a code snippet demonstrating the solution.',
+    description: 'Instruct the LLM to always provide a code snippet.',
     active: true,
     category: 'style'
   },
   {
-    id: 'error-handling',
-    label: 'Robust Error Handling',
-    description: 'Require try/except or try/catch blocks for all external operations.',
+    id: 'security-owasp',
+    label: 'OWASP Security First',
+    description: 'Mandate input validation and sanitization against top web vulnerabilities.',
     active: false,
     category: 'safety'
   },
   {
-    id: 'comments-docs',
-    label: 'Documentation & Comments',
-    description: 'Require JSDoc/Docstrings for all functions.',
+    id: 'chain-of-thought',
+    label: 'Chain of Thought (CoT)',
+    description: 'Force step-by-step reasoning before providing the final answer.',
     active: false,
-    category: 'style'
+    category: 'optimization'
   },
   {
-    id: 'concise-code',
-    label: 'Concise Implementation',
-    description: 'Avoid boilerplate; prefer functional patterns where applicable.',
+    id: 'error-handling',
+    label: 'Robust Error Handling',
+    description: 'Require try/except blocks for all external operations.',
     active: false,
-    category: 'style'
+    category: 'safety'
   },
   {
     id: 'allow-mistakes',
     label: 'Allow Creative Hallucination',
-    description: 'Loosen constraints to allow the LLM to invent libraries or patterns (experimental).',
+    description: 'Loosen constraints to allow the LLM to invent libraries (experimental).',
     active: false,
     category: 'safety' 
   }
@@ -72,19 +94,23 @@ export const PROJECT_TEMPLATES: Template[] = [
     }
   },
   {
-    name: "Data Science Core",
-    description: "Python, SQL, Docker",
-    icon: "database",
+    name: "Local RP Assistant",
+    description: "Uncensored, Llama 3 Optimized",
+    icon: "cpu",
     config: {
-      selectedStacks: ['Python', 'SQL', 'Docker'],
-      tone: 'Educational',
-      description: "Create a data processing pipeline. Include pandas for manipulation and SQLAlchemy for database interactions. Containerize the script."
+      selectedStacks: ['Generic'],
+      tone: 'Concise',
+      description: "A creative roleplay assistant running locally. It should adapt to user scenarios without moralizing or refusals.",
+      constraints: DEFAULT_CONSTRAINTS.map(c => 
+        (c.id === 'local-llm-opt' || c.id === 'nsfw-allow') ? { ...c, active: true } : 
+        (c.id === 'no-break-changes') ? { ...c, active: false } : c
+      )
     }
   },
   {
     name: "Systems Programming",
     description: "Rust, AWS",
-    icon: "cpu",
+    icon: "database",
     config: {
       selectedStacks: ['Rust', 'AWS'],
       tone: 'Concise',

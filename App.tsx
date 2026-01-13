@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
 import { ProjectConfig, TechStack, Template } from './types';
 import { DEFAULT_CONSTRAINTS, PROJECT_TEMPLATES } from './constants';
-import { generateSystemInstruction, analyzeProjectUrl } from './services/geminiService';
+import { generateSystemInstruction, analyzeProjectUrl, analyzeMedia, analyzeCodebaseFile } from './services/geminiService';
 import StackSelector from './components/StackSelector';
 import ConstraintBuilder from './components/ConstraintBuilder';
 import ResultView from './components/ResultView';
 import DevConsole from './components/DevConsole';
-import { Cpu, Terminal, Wand2, Loader2, ArrowRight, Layers, Database, Box, Link2, Search } from 'lucide-react';
+import { Cpu, Terminal, Wand2, Loader2, ArrowRight, Layers, Database, Box, Link2, Search, Upload, FileCode } from 'lucide-react';
 
 export default function App() {
   const [config, setConfig] = useState<ProjectConfig>({
@@ -27,6 +27,7 @@ export default function App() {
   
   // Ref for interval cleanup
   const logIntervalRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleConstraintToggle = (id: string) => {
     setConfig(prev => ({
@@ -67,11 +68,9 @@ export default function App() {
     if (!urlInput) return;
     
     setIsAnalyzing(true);
-    // Reset view to show logs if hidden, but we aren't generating full prompt yet
-    // Just minimal logs for analysis
+    setLogs([]); // clear old logs for clarity
     
     try {
-      // Basic validation
       new URL(urlInput);
     } catch {
       alert("Please enter a valid URL (e.g., https://github.com/...)");
@@ -104,6 +103,54 @@ export default function App() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzing(true);
+    setLogs([]);
+    addLog(`[INFO] Reading file: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+
+    try {
+        let analysis: Partial<ProjectConfig> = {};
+
+        // Determine handling strategy based on file type
+        const isCodeFile = file.name.endsWith('.json') || file.name.endsWith('.xml') || file.type.includes('json') || file.type.includes('xml');
+        
+        if (isCodeFile) {
+            addLog(`[CODE] Parsing structure with Gemini Flash (1M Context)...`);
+            const textContent = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target?.result as string);
+                reader.onerror = reject;
+                reader.readAsText(file);
+            });
+            analysis = await analyzeCodebaseFile(textContent, file.name);
+        } else {
+            // Assume image/video
+            addLog(`[VIS] Processing frames/pixels with Gemini Pro Vision...`);
+            analysis = await analyzeMedia(file);
+        }
+
+        addLog(`[SUCCESS] Analysis complete.`);
+        if (analysis.name) addLog(`[DATA] Inferred Name: ${analysis.name}`);
+        
+        setConfig(prev => ({
+          ...prev,
+          name: analysis.name || prev.name,
+          description: analysis.description || prev.description,
+          selectedStacks: (analysis.selectedStacks as TechStack[]) || prev.selectedStacks,
+          tone: (analysis.tone as any) || prev.tone
+        }));
+
+    } catch(err) {
+        addLog(`[ERR] Analysis failed: ${err}`);
+    } finally {
+        setIsAnalyzing(false);
+        if (fileInputRef.current) fileInputRef.current.value = ''; // reset
+    }
+  };
+
   const generateSimulationLogs = () => {
     const steps = [
         `[INFO] Starting compile job for project: "${config.name || 'Untitled'}"`,
@@ -112,9 +159,9 @@ export default function App() {
         `[WARN] Checking constraint compatibility...`,
         `[INFO] ${config.constraints.filter(c => c.active).length} active constraints applied.`,
         `[INFO] Tone setting: ${config.tone}`,
-        `[REQ] Initiating handshake with Gemini API...`,
-        `[NET] Sending payload (approx. 4kb)...`,
-        `[WAIT] Awaiting token stream...`,
+        `[REQ] Initiating Gemini 3 Pro (Thinking Mode)...`,
+        `[THINK] Allocating 32k token thinking budget...`,
+        `[WAIT] Reasoning in progress (this may take a moment)...`,
     ];
 
     let stepIndex = 0;
@@ -127,7 +174,7 @@ export default function App() {
             addLog(steps[stepIndex]);
             stepIndex++;
         }
-    }, 600); // Add a log every 600ms
+    }, 800);
   };
 
   const handleGenerate = async () => {
@@ -189,12 +236,12 @@ export default function App() {
           <section className="bg-slate-800/20 border border-brand-500/20 rounded-xl p-4">
             <label className="text-sm font-semibold text-brand-300 uppercase tracking-wider flex items-center gap-2 mb-3">
                <Link2 size={16} />
-               Smart Import (GitHub / YouTube / Web)
+               Smart Import
             </label>
             <div className="flex gap-2">
               <input 
                 type="text" 
-                placeholder="https://github.com/username/repo or video url..." 
+                placeholder="https://github.com/..." 
                 className="flex-1 bg-slate-900/80 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all placeholder-slate-600"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
@@ -202,17 +249,41 @@ export default function App() {
               <button
                 onClick={handleAnalyzeUrl}
                 disabled={isAnalyzing || !urlInput}
-                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                title="Auto-Detect from URL"
               >
-                {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                {isAnalyzing ? 'Analyzing...' : 'Auto-Detect'}
+                {isAnalyzing && urlInput ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                <span className="hidden sm:inline">Fetch</span>
+              </button>
+
+              <div className="w-px bg-slate-700 mx-1"></div>
+
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*,video/*,.json,.xml"
+                onChange={handleFileUpload}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isAnalyzing}
+                className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                title="Upload Media (Images/Video) or Config (JSON/XML)"
+              >
+                {isAnalyzing && !urlInput ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                <span className="hidden sm:inline">Import File</span>
               </button>
             </div>
             {isAnalyzing && (
-               <div className="mt-2 text-xs text-slate-500 font-mono">
-                  Scanning URL content via Gemini Grounding...
+               <div className="mt-2 text-xs text-slate-500 font-mono flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-pulse"></div>
+                  Extracting project intelligence...
                </div>
             )}
+            <p className="mt-2 text-[10px] text-slate-600 font-mono pl-1">
+               Supports: .json (package.json), .xml (repomix), images, video
+            </p>
           </section>
 
           {/* Quick Start Templates */}
@@ -305,7 +376,7 @@ export default function App() {
                     {isGenerating ? (
                         <>
                             <Loader2 className="animate-spin" />
-                            <span className="text-sm font-normal text-slate-500">Constructing...</span>
+                            <span className="text-sm font-normal text-slate-500">Thinking...</span>
                         </>
                     ) : (
                         <>
@@ -346,6 +417,7 @@ export default function App() {
          {!isGenerating && generatedContent && (
              <ResultView 
                 content={generatedContent} 
+                onUpdate={setGeneratedContent}
                 onClose={() => setShowResult(false)}
              />
          )}
