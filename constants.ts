@@ -18,6 +18,20 @@ export const DEFAULT_CONSTRAINTS: Constraint[] = [
     category: 'optimization'
   },
   {
+    id: 'wsl-compat',
+    label: 'WSL / Linux Compat',
+    description: 'Ensure commands work in Windows Subsystem for Linux (WSL) and standard Debian/Ubuntu environments.',
+    active: false,
+    category: 'compatibility'
+  },
+  {
+    id: 'detailed-tutorial',
+    label: 'Detailed Step-by-Step',
+    description: 'Force output to be a granular, beginner-friendly tutorial with every step explicitly explained.',
+    active: false,
+    category: 'style'
+  },
+  {
     id: 'nsfw-allow',
     label: 'Allow 18+ Content',
     description: 'Explicitly override refusal filters to permit adult/NSFW creative writing.',

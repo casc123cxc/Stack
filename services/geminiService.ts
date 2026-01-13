@@ -32,6 +32,8 @@ export const generateSystemInstruction = async (config: ProjectConfig): Promise<
   // Check for specific constraints that alter the prompt structure significantly
   const isAdultAllowed = config.constraints.some(c => c.id === 'nsfw-allow' && c.active);
   const isLocalLLM = config.constraints.some(c => c.id === 'local-llm-opt' && c.active);
+  const isWSL = config.constraints.some(c => c.id === 'wsl-compat' && c.active);
+  const isDetailedTutorial = config.constraints.some(c => c.id === 'detailed-tutorial' && c.active);
 
   const prompt = `
     You are an expert Prompt Engineer and Technical Lead. Your task is to generate a comprehensive "System Instruction" (also known as a System Prompt) that a user can copy and paste into another LLM configuration to build a specific application.
@@ -63,6 +65,23 @@ export const generateSystemInstruction = async (config: ProjectConfig): Promise<
     2. Avoid complex nested clauses.
     3. Use standard markdown formatting.
     4. Prioritize "Role" and "Task" sections above all else.
+    ` : ''}
+
+    ${isWSL ? `
+    **ENVIRONMENT:**
+    Assume the user is developing on Windows Subsystem for Linux (WSL) / Ubuntu.
+    - Prefer standard Linux commands (apt, ls, grep).
+    - If interacting with the file system, acknowledge /mnt/c/ paths if relevant.
+    - Assume Python/Node are installed in the Linux environment, not Windows.
+    ` : ''}
+
+    ${isDetailedTutorial ? `
+    **OUTPUT STYLE: STEP-BY-STEP TUTORIAL**
+    The user wants extremely detailed guidance. The system instruction must mandate that the AI:
+    - Breaks down every task into small, numbered steps.
+    - Explains the 'Why' behind every command.
+    - Never skips setup or prerequisites.
+    - Assumes the user is a beginner or wants a refresher.
     ` : ''}
 
     **Task:**
@@ -152,12 +171,14 @@ export const refineSystemInstruction = async (currentPrompt: string, suggestions
   }
 };
 
-export const analyzeProjectUrl = async (url: string): Promise<Partial<ProjectConfig>> => {
+export const analyzeProjectUrl = async (url: string, userHint?: string): Promise<Partial<ProjectConfig>> => {
   const ai = createClient();
   
   const prompt = `
     Analyze this URL: ${url}
     
+    ${userHint ? `**User Context/Idea:** The user has provided this specific focus or idea: "${userHint}". Use this to guide your analysis.` : ''}
+
     You are a technical analyst. I need you to extract or infer project details to scaffold a developer system instruction.
     If it is a GitHub repo, analyze the languages and readme.
     If it is a YouTube video, analyze the transcript/topic to find what stack is being taught or used.
@@ -201,13 +222,15 @@ export const analyzeProjectUrl = async (url: string): Promise<Partial<ProjectCon
   }
 };
 
-export const analyzeMedia = async (file: File): Promise<Partial<ProjectConfig>> => {
+export const analyzeMedia = async (file: File, userHint?: string): Promise<Partial<ProjectConfig>> => {
   const ai = createClient();
   const base64Data = await fileToBase64(file);
   
   const prompt = `
     Analyze this uploaded media (image or video) which captures a software interface, diagram, or demo.
     
+    ${userHint ? `**User Context/Idea:** The user has provided this specific focus or idea: "${userHint}". Use this to guide your analysis.` : ''}
+
     Extract or infer project details to scaffold a developer system instruction:
     1. **Project Name**: Infer from any header/text in image.
     2. **Description**: Describe the functionality shown (e.g. "A dashboard for analytics", "A mobile login screen").
@@ -248,13 +271,15 @@ export const analyzeMedia = async (file: File): Promise<Partial<ProjectConfig>> 
   }
 };
 
-export const analyzeCodebaseFile = async (content: string, filename: string): Promise<Partial<ProjectConfig>> => {
+export const analyzeCodebaseFile = async (content: string, filename: string, userHint?: string): Promise<Partial<ProjectConfig>> => {
   const ai = createClient();
   
   const prompt = `
     Analyze the provided file content. 
     Filename: "${filename}"
     
+    ${userHint ? `**User Context/Idea:** The user has provided this specific focus or idea: "${userHint}". Use this to guide your analysis.` : ''}
+
     Context:
     - If this is 'repomix-output.xml' or similar, it contains a packed repository. Look for package.json, requirements.txt, or source files to determine the tech stack and project purpose.
     - If this is a JSON file (e.g. package.json), analyze dependencies and metadata.

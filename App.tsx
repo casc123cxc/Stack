@@ -6,7 +6,7 @@ import StackSelector from './components/StackSelector';
 import ConstraintBuilder from './components/ConstraintBuilder';
 import ResultView from './components/ResultView';
 import DevConsole from './components/DevConsole';
-import { Cpu, Terminal, Wand2, Loader2, ArrowRight, Layers, Database, Box, Link2, Search, Upload, FileCode } from 'lucide-react';
+import { Cpu, Terminal, Wand2, Loader2, ArrowRight, Layers, Database, Box, Link2, Search, Upload, FileCode, Sparkles } from 'lucide-react';
 
 export default function App() {
   const [config, setConfig] = useState<ProjectConfig>({
@@ -19,6 +19,7 @@ export default function App() {
   });
 
   const [urlInput, setUrlInput] = useState('');
+  const [importContext, setImportContext] = useState('');
   const [generatedContent, setGeneratedContent] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -79,10 +80,11 @@ export default function App() {
     }
 
     addLog(`[INFO] Analyzing external resource: ${urlInput}`);
+    if (importContext) addLog(`[CTX] Using user hint: "${importContext.substring(0, 30)}..."`);
     addLog(`[NET] Initiating search grounding...`);
 
     try {
-      const analysis = await analyzeProjectUrl(urlInput);
+      const analysis = await analyzeProjectUrl(urlInput, importContext);
       
       addLog(`[SUCCESS] Analysis complete.`);
       if (analysis.name) addLog(`[DATA] Detected Name: ${analysis.name}`);
@@ -110,6 +112,7 @@ export default function App() {
     setIsAnalyzing(true);
     setLogs([]);
     addLog(`[INFO] Reading file: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`);
+    if (importContext) addLog(`[CTX] Using user hint: "${importContext.substring(0, 30)}..."`);
 
     try {
         let analysis: Partial<ProjectConfig> = {};
@@ -125,11 +128,11 @@ export default function App() {
                 reader.onerror = reject;
                 reader.readAsText(file);
             });
-            analysis = await analyzeCodebaseFile(textContent, file.name);
+            analysis = await analyzeCodebaseFile(textContent, file.name, importContext);
         } else {
             // Assume image/video
             addLog(`[VIS] Processing frames/pixels with Gemini Pro Vision...`);
-            analysis = await analyzeMedia(file);
+            analysis = await analyzeMedia(file, importContext);
         }
 
         addLog(`[SUCCESS] Analysis complete.`);
@@ -233,11 +236,27 @@ export default function App() {
         <main className="flex-1 overflow-y-auto p-8 space-y-8 pb-32">
           
           {/* Smart Import */}
-          <section className="bg-slate-800/20 border border-brand-500/20 rounded-xl p-4">
-            <label className="text-sm font-semibold text-brand-300 uppercase tracking-wider flex items-center gap-2 mb-3">
-               <Link2 size={16} />
-               Smart Import
-            </label>
+          <section className="bg-slate-800/20 border border-brand-500/20 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold text-brand-300 uppercase tracking-wider flex items-center gap-2">
+                   <Link2 size={16} />
+                   Smart Import
+                </label>
+            </div>
+
+            {/* Context/Idea Input */}
+            <div className="relative group">
+                <div className="absolute top-2.5 left-3 text-slate-500">
+                    <Sparkles size={14} />
+                </div>
+                <textarea
+                    placeholder="Add a Seed Idea or Context to guide the analysis (e.g. 'I want to build a scraping bot, check this repo for style')..."
+                    className="w-full h-20 bg-slate-900/80 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs focus:ring-1 focus:ring-brand-500 focus:border-brand-500 outline-none transition-all placeholder-slate-600 resize-none"
+                    value={importContext}
+                    onChange={(e) => setImportContext(e.target.value)}
+                />
+            </div>
+
             <div className="flex gap-2">
               <input 
                 type="text" 
@@ -275,13 +294,15 @@ export default function App() {
                 <span className="hidden sm:inline">Import File</span>
               </button>
             </div>
-            {isAnalyzing && (
+            
+            {(isAnalyzing) && (
                <div className="mt-2 text-xs text-slate-500 font-mono flex items-center gap-2">
                   <div className="w-1.5 h-1.5 bg-brand-500 rounded-full animate-pulse"></div>
                   Extracting project intelligence...
                </div>
             )}
-            <p className="mt-2 text-[10px] text-slate-600 font-mono pl-1">
+            
+            <p className="text-[10px] text-slate-600 font-mono pl-1">
                Supports: .json (package.json), .xml (repomix), images, video
             </p>
           </section>
